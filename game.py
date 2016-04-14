@@ -4,8 +4,25 @@ from kivy.core.window import Window
 from kivy.uix.image import Image
 from kivy.clock import Clock
 from kivy.uix.label import Label
+from kivy.core.audio import SoundLoader
 
 import random
+
+class MultiSound(object):
+    def __init__(self, file, num):
+        self.num = num
+        self.sounds = [SoundLoader.load(file) for n in range(num)]
+        self.index = 0
+
+    def play(self):
+        self.sounds[self.index].play()
+        self.index += 1
+        if self.index == self.num:
+            self.index = 0
+
+sfx_flap = MultiSound('audio/flap.wav', 3)
+sfx_score = MultiSound('audio/score.wav', 3)
+sfx_die = MultiSound('audio/die.wav', 3)
 
 class Sprite(Image):
     def __init__(self, **kwargs):
@@ -50,6 +67,7 @@ class Bird(Sprite):
     def on_touch_down(self, *ignore):
         self.velocity_y = 5.5
         self.source = 'atlas://images/bird_anim/wing-down'
+        sfx_flap.play()
 
 
 class Ground(Sprite):
@@ -135,6 +153,7 @@ class Game(Widget):
                 pipe.scored = True
                 self.score += 1
                 self.score_label.text = str(self.score)
+                sfx_score.play()
 
             if pipe.top_image.collide_widget(self.bird):
                 self.game_over = True
@@ -142,17 +161,38 @@ class Game(Widget):
                 self.game_over = True
 
         if self.game_over:
+            sfx_die.play()
             self.game_over_label.text += self.score_label.text
             self.game_over_label.opacity = 1
             self.score_label.opacity = 0
+            self.bind(on_touch_down=self._on_touch_down)
+
+    def _on_touch_down(self, *ignore):
+        parent = self.parent
+        parent.remove_widget(self)
+        parent.add_widget(Menu())
+
+
+class Menu(Widget):
+    def __init__(self):
+        super(Menu, self).__init__()
+        self.add_widget(Sprite(source='images/background.png'))
+        self.size = self.children[0].size
+        self.add_widget(Ground(source='images/ground.png'))
+        self.add_widget(Label(center=self.center, text='tab to start'))
+
+    def on_touch_down(self, *ignore):
+        parent = self.parent
+        parent.remove_widget(self)
+        parent.add_widget(Game())
 
 
 class GameApp(App):
     def build(self):
-        game = Game()
-        Window.size = game.size
-        return game
-
+        top = Widget()
+        top.add_widget(Menu())
+        Window.size = top.children[0].size
+        return top
 
 if __name__=="__main__":
     GameApp().run()
